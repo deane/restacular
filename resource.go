@@ -1,6 +1,7 @@
 package restacular
 
 import (
+	"log"
 	"net/http"
 )
 
@@ -25,9 +26,20 @@ func NewResource(name string, basePath string) *Resource {
 }
 
 // AddRoute calls the HTTP_METHOD func or panic
-// for stuff that doesn't map with a rest request
 func (resource *Resource) AddRoute(method string, pattern string, handler http.Handler) {
-	resource.routes = append(resource.routes, &Route{method, pattern, handler})
+	methods := map[string]bool{
+		"GET":     true,
+		"POST":    true,
+		"PUT":     true,
+		"PATCH":   true,
+		"DELETE":  true,
+		"OPTIONS": true,
+	}
+
+	if _, ok := methods[method]; ok == false {
+		log.Panicln("Tried to add an handler with a method that does not exist")
+	}
+	resource.routes = append(resource.routes, &Route{method, resource.pattern + pattern, handler})
 }
 
 func (resource *Resource) GET(pattern string, handler http.Handler) {
