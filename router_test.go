@@ -1,6 +1,7 @@
 package restacular
 
 import (
+	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,11 +18,11 @@ func (p PostResource) Define() *Resource {
 	return resource
 }
 
-func (p PostResource) List(resp http.ResponseWriter, req *http.Request, params map[string]string) {
+func (p PostResource) List(resp http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	resp.WriteHeader(200)
 }
 
-func (p PostResource) Post(resp http.ResponseWriter, req *http.Request, params map[string]string) {
+func (p PostResource) Post(resp http.ResponseWriter, req *http.Request, params httprouter.Params) {
 	resp.WriteHeader(200)
 }
 
