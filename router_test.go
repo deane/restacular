@@ -1,7 +1,6 @@
 package restacular
 
 import (
-	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,16 +17,16 @@ func (p PostResource) Define() *Resource {
 	return resource
 }
 
-func (p PostResource) List(resp http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (p PostResource) List(context Context, resp http.ResponseWriter, req *http.Request) {
 	resp.WriteHeader(200)
 }
 
-func (p PostResource) Post(resp http.ResponseWriter, req *http.Request, params httprouter.Params) {
+func (p PostResource) Post(context Context, resp http.ResponseWriter, req *http.Request) {
 	resp.WriteHeader(200)
 }
 
 // Small util function to quickly HTTP requests
-func doRequest(method string, path string, router *Router, t *testing.T) *httptest.ResponseRecorder {
+func doRequest(method string, path string, router *router, t *testing.T) *httptest.ResponseRecorder {
 	req, err := http.NewRequest(method, path, nil)
 	if err != nil {
 		t.Fatal("Errored when doing an HTTP request")
