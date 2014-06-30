@@ -3,6 +3,7 @@ package restacular
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 type router struct {
@@ -31,7 +32,12 @@ type Context struct {
 func (router *router) Handle(method string, path string, handler HandlerFunc) {
 	// TODO: check method is valid
 	// TODO: check that first char is / otherwise panic
-	node := router.tree.addPath(path[1:], true)
+
+	// Add a trailing slash to easily handle all cases
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+	node := router.tree.addPath(strings.ToLower(path[1:]), true)
 
 	node.setHandler(method, handler)
 }
@@ -86,8 +92,12 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	var params map[string]string
 	path := req.URL.Path
 
-	node := router.tree.find(path[1:], &params)
-	//fmt.Printf("Path: %s - %s, %v\n", path, path[1:], node)
+	if !strings.HasSuffix(path, "/") {
+		path += "/"
+	}
+
+	node := router.tree.find(strings.ToLower(path[1:]), &params)
+
 	if node != nil {
 		if handler, ok := node.handlers[req.Method]; ok {
 			context := Context{

@@ -3,11 +3,17 @@ restacular
 
 ## Router
 Several things to fix before being usable:
-
+- stop adding / everywhere => moved that part to the router for now (still want a proper fix)
 - rewrite the find method of the trie to use a loop to avoid passing a pointer to a map
-- stop adding / everywhere
-- benchmark and find things to optimize
 - add more checks when adding route to prevent a bad tree
+
+Perfs:
+Initial:
+	BenchmarkGettingRouteWithoutParam	20000000	       105 ns/op	       8 B/op	       0 allocs/op
+	BenchmarkGettingRouteWithParam	 1000000	      1663 ns/op	     785 B/op	       6 allocs/op
+After toLower(path)
+	BenchmarkGettingRouteWithoutParam	10000000	       169 ns/op	       8 B/op	       0 allocs/op
+	BenchmarkGettingRouteWithParam	 1000000	      1769 ns/op	     794 B/op	       7 allocs/op
 
 
 ## TODO now:

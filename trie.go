@@ -132,11 +132,6 @@ func (n *node) addPath(path string, addPriority bool) *node {
 		return n
 	}
 
-	// Always add a / to the end of a path if missing to simplify routing
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
-	}
-
 	isWilcard := path[0] == ':'
 	nextSlash := strings.Index(path, "/")
 	// what we are actually going to look at in that iteration
@@ -211,12 +206,6 @@ func (n *node) find(path string, params *map[string]string) *node {
 	// end of the path, do we have a handler?
 	if pathLen == 0 {
 		return n
-	}
-
-	// Always add a / to the end of a path if missing to simplify routing
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
-		pathLen += 1
 	}
 
 	// First we try to find a match in the static children

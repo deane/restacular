@@ -36,10 +36,14 @@ func doRequest(method string, path string, router *router, t *testing.T) *httpte
 	return w
 }
 
-func TestAddingResource(t *testing.T) {
+func createRouter() *router {
 	router := NewRouter("https://www.testing.com/api/")
 	router.AddResource("posts", &PostResource{})
+	return router
+}
 
+func TestAddingResource(t *testing.T) {
+	router := createRouter()
 	w := doRequest("GET", "/posts", router, t)
 	if w.Code != 200 {
 		t.Errorf("Received http code %d instead of 200", w.Code)
@@ -54,6 +58,28 @@ func TestAddingResource(t *testing.T) {
 	w = doRequest("POST", "/posts", router, t)
 	if w.Code != 404 {
 		t.Errorf("Received http code %d instead of 404", w.Code)
+	}
+}
+
+func TestFindingRouteCaseSensitivy(t *testing.T) {
+	router := createRouter()
+	w := doRequest("GET", "/POSTs", router, t)
+	if w.Code != 200 {
+		t.Errorf("Received http code %d instead of 200", w.Code)
+	}
+}
+
+func TestFindingRouteTrailingSlash(t *testing.T) {
+	router := createRouter()
+
+	w := doRequest("GET", "/posts/", router, t)
+	if w.Code != 200 {
+		t.Errorf("Received http code %d instead of 200", w.Code)
+	}
+
+	w = doRequest("GET", "/posts", router, t)
+	if w.Code != 200 {
+		t.Errorf("Received http code %d instead of 200", w.Code)
 	}
 }
 
@@ -89,15 +115,13 @@ func benchRequest(b *testing.B, router http.Handler, r *http.Request) {
 }
 
 func BenchmarkGettingRouteWithoutParam(b *testing.B) {
-	router := NewRouter("https://www.testing.com/api/")
-	router.AddResource("posts", &PostResource{})
+	router := createRouter()
 	req, _ := http.NewRequest("GET", "/posts", nil)
 	benchRequest(b, router, req)
 }
 
 func BenchmarkGettingRouteWithParam(b *testing.B) {
-	router := NewRouter("https://www.testing.com/api/")
-	router.AddResource("posts", &PostResource{})
+	router := createRouter()
 	req, _ := http.NewRequest("GET", "/posts/1", nil)
 	benchRequest(b, router, req)
 }

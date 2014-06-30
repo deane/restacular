@@ -13,11 +13,11 @@ func fakeView(http.ResponseWriter, *http.Request) {}
 func TestAddingRoutes(t *testing.T) {
 	tree := &node{path: "/"}
 
-	// leading slash will have been removed by the router
-	tree.addPath("users", true)
+	// leading slash will have been removed by the router and trailing added
+	tree.addPath("users/", true)
 	tree.addPath("users/:id/", true)
-	tree.addPath("users/:id/files/", true) // one with a trailing slash
-	tree.addPath("users/:id/friends", true)
+	tree.addPath("users/:id/files/", true)
+	tree.addPath("users/:id/friends/", true)
 
 	// we should have only one child, a static one
 	numberChildren := len(tree.staticChildren) + len(tree.wildcardChildren)
@@ -48,11 +48,11 @@ func TestFindingRoutes(t *testing.T) {
 	tree := &node{path: "/"}
 	var params map[string]string
 
-	// leading slash will have been removed by the router
-	tree.addPath("users", true)
+	// leading slash will have been removed by the router and trailing added
+	tree.addPath("users/", true)
 	tree.addPath("users/:id/", true)
-	tree.addPath("users/:id/files/", true) // one with a trailing slash
-	tree.addPath("users/:id/friends", true)
+	tree.addPath("users/:id/files/", true)
+	tree.addPath("users/:id/friends/", true)
 
 	// Find a basic static one
 	node := tree.find("users/", &params) // Router will add a /
@@ -73,5 +73,4 @@ func TestFindingRoutes(t *testing.T) {
 		t.Log(params["id"])
 		t.Errorf("Got %v as params but didn't get id=142", params)
 	}
-
 }
