@@ -56,3 +56,48 @@ func TestAddingResource(t *testing.T) {
 		t.Errorf("Received http code %d instead of 404", w.Code)
 	}
 }
+
+type mockResponseWriter struct{}
+
+func (m *mockResponseWriter) Header() (h http.Header) {
+	return http.Header{}
+}
+
+func (m *mockResponseWriter) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
+
+func (m *mockResponseWriter) WriteString(s string) (n int, err error) {
+	return len(s), nil
+}
+
+func (m *mockResponseWriter) WriteHeader(int) {}
+
+func benchRequest(b *testing.B, router http.Handler, r *http.Request) {
+	w := new(mockResponseWriter)
+	u := r.URL
+	rq := u.RawQuery
+	r.RequestURI = u.RequestURI()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		u.RawQuery = rq
+		router.ServeHTTP(w, r)
+	}
+}
+
+func BenchmarkGettingRouteWithoutParam(b *testing.B) {
+	router := NewRouter("https://www.testing.com/api/")
+	router.AddResource("posts", &PostResource{})
+	req, _ := http.NewRequest("GET", "/posts", nil)
+	benchRequest(b, router, req)
+}
+
+func BenchmarkGettingRouteWithParam(b *testing.B) {
+	router := NewRouter("https://www.testing.com/api/")
+	router.AddResource("posts", &PostResource{})
+	req, _ := http.NewRequest("GET", "/posts/1", nil)
+	benchRequest(b, router, req)
+}
