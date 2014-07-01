@@ -14,7 +14,10 @@ Initial:
 After toLower(path)
 	BenchmarkGettingRouteWithoutParam	10000000	       169 ns/op	       8 B/op	       0 allocs/op
 	BenchmarkGettingRouteWithParam	 1000000	      1769 ns/op	     794 B/op	       7 allocs/op
-
+After rewriting find()
+	BenchmarkGettingRouteWithoutParam	10000000	       217 ns/op	      16 B/op	       1 allocs/op
+	BenchmarkGettingRouteWithOneParam	 1000000	      1156 ns/op	     436 B/op	       5 allocs/op
+	BenchmarkGettingRouteWithTwoParam	 1000000	      1809 ns/op	     487 B/op	       5 allocs/op
 
 ## TODO now:
 - create interface for a Resource as defined in the gist
@@ -30,3 +33,4 @@ After toLower(path)
 - reverse for HATEOAS
 - validation
 - example app copying github API to see how well it works and tweak things to make it nicer to use
+

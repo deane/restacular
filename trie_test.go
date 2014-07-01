@@ -1,16 +1,12 @@
 package restacular
 
 import (
-	"net/http"
 	"testing"
 )
 
 // Tests the trie independtly of the router
 
-func fakeView(http.ResponseWriter, *http.Request) {}
-
-// Kind of integration test, verify that routes are properly added to the trie
-func TestAddingRoutes(t *testing.T) {
+func createTrie() *node {
 	tree := &node{path: "/"}
 
 	// leading slash will have been removed by the router and trailing added
@@ -18,10 +14,19 @@ func TestAddingRoutes(t *testing.T) {
 	tree.addPath("users/:id/", true)
 	tree.addPath("users/:id/files/", true)
 	tree.addPath("users/:id/friends/", true)
+	tree.addPath("ideas/:id/", true)
+	tree.addPath("images/:id/", true)
+
+	return tree
+}
+
+// Kind of integration test, verify that routes are properly added to the trie
+func TestAddingRoutes(t *testing.T) {
+	tree := createTrie()
 
 	// we should have only one child, a static one
 	numberChildren := len(tree.staticChildren) + len(tree.wildcardChildren)
-	if numberChildren > 1 {
+	if numberChildren > 2 {
 		t.Log("\n" + tree.printTree("", ""))
 		t.Errorf("Got more than 1 child node when adding routes, got %d", numberChildren)
 	}
@@ -45,17 +50,10 @@ func TestAddingRoutes(t *testing.T) {
 }
 
 func TestFindingRoutes(t *testing.T) {
-	tree := &node{path: "/"}
-	var params map[string]string
-
-	// leading slash will have been removed by the router and trailing added
-	tree.addPath("users/", true)
-	tree.addPath("users/:id/", true)
-	tree.addPath("users/:id/files/", true)
-	tree.addPath("users/:id/friends/", true)
+	tree := createTrie()
 
 	// Find a basic static one
-	node := tree.find("users/", &params) // Router will add a /
+	node, params := tree.find("/users/") // Router will add a /
 
 	if node.path != "users/" {
 		t.Log("\n" + tree.printTree("", ""))
@@ -63,7 +61,7 @@ func TestFindingRoutes(t *testing.T) {
 	}
 
 	// Find a wildcard path
-	node = tree.find("users/142/friends/", &params)
+	node, params = tree.find("/users/142/friends/")
 	if node.path != "riends/" {
 		t.Log("\n" + tree.printTree("", ""))
 		t.Errorf("Got %s as path instead of riends when querying users", node.path)

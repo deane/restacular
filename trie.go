@@ -172,7 +172,8 @@ func (n *node) addPath(path string, addPriority bool) *node {
 	if commonChild != nil {
 		// 2 cases there as well
 		// Either the path is fully the same and we can just continue our merry trip
-		if commonUntil == len(token)-1 {
+		// TODO: check in which case we get commonUntil == 0, if we have only one char?
+		if commonUntil == 0 || commonUntil == len(token)-1 {
 			commonChild.priority++
 			n.sortChildren(indexChild)
 			return commonChild.addPath(path[commonUntil+1:], false)
@@ -198,73 +199,70 @@ func (n *node) addPath(path string, addPriority bool) *node {
 	return child.addPath(remainingPath, true)
 }
 
-// TODO: rewrite that method to use a for loop so we don't have to pass a pointer to a map
-// TODO check for handlers,  test case sensitivity
-func (n *node) find(path string, params *map[string]string) *node {
-	pathLen := len(path)
-
-	// end of the path, do we have a handler?
-	if pathLen == 0 {
-		return n
-	}
-
-	// First we try to find a match in the static children
+func findInStatic(n *node, path string) *node {
 	for i, char := range n.Indices {
-		//fmt.Printf("%c - %c\n", char, path[0])
-		//fmt.Printf("Node: %v\n", n)
 		if char == path[0] {
 			child := n.staticChildren[i]
-			childPathLen := len(child.path)
-			//fmt.Printf("Lengths: %d - %d, paths: %s - %s\n", pathLen, childPathLen, path[:childPathLen], child.path)
-			// Compare numbers before comparing strings
-			if pathLen >= childPathLen && child.path == path[:childPathLen] {
-				remainingPath := path[childPathLen:]
-				//fmt.Printf("Remaining: %s\n", remainingPath)
-				return child.find(remainingPath, params)
+			if len(path) >= len(child.path) && child.path == path[:len(child.path)] {
+				return child
 			}
-			break
-		}
-	}
-
-	// Static path were not enough? Introducing wildcard path
-	if len(n.wildcardChildren) > 0 {
-		// Bench that against a basic loop iterating over the chars
-		nextSlash := strings.Index(path, "/")
-		token := path[:nextSlash]
-		nextToken := path[nextSlash+1:]
-
-		//fmt.Printf("Token: %s, next token: %s\n", token, nextToken)
-
-		// So we got a token, but it was empty, that will be a 404
-		if len(token) == 0 {
-			return nil
-		}
-
-		for _, wildcardChildren := range n.wildcardChildren {
-			found := wildcardChildren.find(nextToken, params)
-
-			if found == nil {
-				return nil
-			}
-
-			// Eh ! Caught one
-			// TODO: optimize that part
-			wildPathLen := len(wildcardChildren.path)
-			var param string
-			if wildcardChildren.path[wildPathLen-1] == '/' {
-				param = wildcardChildren.path[:wildPathLen-1]
-			} else {
-				param = wildcardChildren.path
-			}
-
-			if *params == nil {
-				*params = map[string]string{param: token}
-			} else {
-				(*params)[param] = token
-			}
-			return found
 		}
 	}
 
 	return nil
+}
+
+func (n *node) find(path string) (*node, map[string]string) {
+	var params map[string]string
+
+	// gofmt is a bit weird here with the indentation
+	for len(path) >= len(n.path) {
+		path = path[len(n.path):]
+		//fmt.Printf("Path: %s, node path: %s\n", path, n.path)
+
+		if len(path) > 0 {
+			child := findInStatic(n, path)
+
+			if child != nil {
+				//fmt.Printf("Continuing after finding static %v\n", child)
+				n = child
+			} else {
+				// no luck in the static? check wildcard children
+				for _, wildcardChildren := range n.wildcardChildren {
+					nextSlash := strings.Index(path, "/")
+
+					// check whether we have something after that path
+					if len(path[nextSlash+1:]) == 0 {
+						if params == nil {
+							params = make(map[string]string)
+						}
+						params[wildcardChildren.path[:len(wildcardChildren.path)-1]] = path[:nextSlash]
+						return wildcardChildren, params
+					}
+					// check if next token matches
+					//fmt.Printf("Next token is %s\n", path[strings.Index(path, "/")+1:])
+					child := findInStatic(wildcardChildren, path[nextSlash+1:])
+					if child != nil {
+						//fmt.Printf("Continuing after finding wildcard %v\n", wildcardChildren)
+						n = wildcardChildren
+						if params == nil {
+							params = make(map[string]string)
+						}
+						params[wildcardChildren.path[:len(wildcardChildren.path)-1]] = path[:nextSlash]
+						// Very stupid hack due to adding / everywhere
+						path = path[1:]
+					}
+				}
+			}
+
+		} else {
+			return n, params
+		}
+
+	}
+
+	fmt.Printf("404: path: %s, node path: %s\n", path, n.path)
+	// Ain't got nothing
+	// TODO: 404 handling
+	return n, params
 }

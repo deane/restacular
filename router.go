@@ -89,14 +89,14 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}(resp, req)
 	}
 
-	var params map[string]string
 	path := req.URL.Path
 
+	// TODO: does one allocation, remove the need for the hack in the trie
 	if !strings.HasSuffix(path, "/") {
 		path += "/"
 	}
 
-	node := router.tree.find(strings.ToLower(path[1:]), &params)
+	node, params := router.tree.find(strings.ToLower(path))
 
 	if node != nil {
 		if handler, ok := node.handlers[req.Method]; ok {
