@@ -32,11 +32,6 @@ type Context struct {
 func (router *router) Handle(method string, path string, handler HandlerFunc) {
 	// TODO: check method is valid
 	// TODO: check that first char is / otherwise panic
-
-	// Add a trailing slash to easily handle all cases
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
-	}
 	node := router.tree.addPath(strings.ToLower(path[1:]), true)
 
 	node.setHandler(method, handler)
@@ -90,11 +85,6 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 
 	path := req.URL.Path
-
-	// TODO: does one allocation, remove the need for the hack in the trie
-	if !strings.HasSuffix(path, "/") {
-		path += "/"
-	}
 
 	node, params := router.tree.find(strings.ToLower(path))
 

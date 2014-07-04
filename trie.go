@@ -20,7 +20,8 @@ type node struct {
 	staticChildren []*node
 
 	// wildcard nodes (those :param ones)
-	wildcardChildren []*node
+	isWildcard    bool
+	wildcardChild *node
 
 	// what are the actual handlers for that given path
 	// those are set in the router directly rather carrying them around
@@ -36,8 +37,8 @@ func (n *node) printTree(indent string, nodeType string) string {
 		line += node.printTree(indent, "")
 	}
 
-	for _, node := range n.wildcardChildren {
-		line += node.printTree(indent, ":")
+	if n.wildcardChild != nil {
+		line += n.wildcardChild.printTree(indent, ":")
 	}
 
 	return line
@@ -59,20 +60,6 @@ func (n *node) sortChildren(i int) {
 		n.Indices[i], n.Indices[i-1] = n.Indices[i-1], n.Indices[i]
 		i -= 1
 	}
-}
-
-func (n *node) addWildcardNode(token string) *node {
-	child := &node{
-		path: token,
-	}
-
-	if n.wildcardChildren == nil {
-		n.wildcardChildren = []*node{child}
-	} else {
-		n.wildcardChildren = append(n.wildcardChildren, child)
-	}
-
-	return child
 }
 
 func (n *node) addStaticNode(token string) *node {
@@ -122,6 +109,7 @@ func (n *node) findCommonStaticChild(token string) (*node, int, int) {
 // when adding static nodes since we add priority right away in that case to
 // reorder the list
 func (n *node) addPath(path string, addPriority bool) *node {
+	// TODO: remove need for this hack
 	// Always increment the priority of the node we're going through
 	if addPriority {
 		n.priority++
@@ -132,31 +120,52 @@ func (n *node) addPath(path string, addPriority bool) *node {
 		return n
 	}
 
-	isWilcard := path[0] == ':'
-	nextSlash := strings.Index(path, "/")
+	firstChar := path[0]
 	// what we are actually going to look at in that iteration
-	token := path[0 : nextSlash+1]
+	var token string
 	// what we will look at in the next iteration
-	remainingPath := path[nextSlash+1:]
+	var remainingPath string
 
-	// For now, don't bother doing a char by char trie for wildcards
-	// It should almost never happen in practice anyway to have 2 different wilcards
-	// from the same parent so doing by the whole token is fine
-	// Not optimized on purpose
-	if isWilcard {
+	// If the first char is a /, we want to know the next one
+	nextSlash := strings.Index(path, "/")
+
+	if firstChar == '/' {
+		token = "/"
+		remainingPath = path[1:]
+	} else if nextSlash != -1 {
+		token = path[0:nextSlash]
+		remainingPath = path[nextSlash:]
+	} else {
+		token = path
+		// No need for remaining path if we're at a leaf node
+	}
+
+	//fmt.Printf("%s - %s - %s\n", path, token, remainingPath)
+
+	// Wildchild path
+	if firstChar == ':' {
 		var child *node
 		token = token[1:]
 
 		// check if we already have it
-		for _, wildcardNode := range n.wildcardChildren {
-			if token == wildcardNode.path {
-				child = wildcardNode
+		if n.wildcardChild != nil {
+			if token == n.wildcardChild.path {
+				child = n.wildcardChild
+			} else {
+				if n.isWildcard {
+					panic("Can't have 2 wildcard nodes at the same level")
+
+				}
 			}
 		}
 
-		// New wildcard node, create a node object and append it to that current node
+		// New wildcard node, create a node object and assign it to the current node
 		if child == nil {
-			child = n.addWildcardNode(token)
+			n.wildcardChild = &node{
+				path:       token,
+				isWildcard: true,
+			}
+			child = n.wildcardChild
 		}
 
 		return child.addPath(remainingPath, true)
@@ -165,6 +174,7 @@ func (n *node) addPath(path string, addPriority bool) *node {
 	// We got a normal string !
 	// 2 things can happen here
 	commonChild, commonUntil, indexChild := n.findCommonStaticChild(token)
+	//fmt.Printf("Common child: %v, common until: %d, node path:%s\n\n", commonChild, commonUntil, n.path)
 
 	// 1 - some child nodes start with the same char as the current path
 	// in that case we want to find the common prefix between both of them
@@ -199,70 +209,70 @@ func (n *node) addPath(path string, addPriority bool) *node {
 	return child.addPath(remainingPath, true)
 }
 
-func findInStatic(n *node, path string) *node {
-	for i, char := range n.Indices {
-		if char == path[0] {
-			child := n.staticChildren[i]
-			if len(path) >= len(child.path) && child.path == path[:len(child.path)] {
-				return child
-			}
-		}
-	}
-
-	return nil
-}
-
 func (n *node) find(path string) (*node, map[string]string) {
 	var params map[string]string
 
-	// gofmt is a bit weird here with the indentation
+FIND:
 	for len(path) >= len(n.path) {
-		path = path[len(n.path):]
-		//fmt.Printf("Path: %s, node path: %s\n", path, n.path)
+		if n.isWildcard == false {
+			path = path[len(n.path):]
+		}
 
-		if len(path) > 0 {
-			child := findInStatic(n, path)
-
-			if child != nil {
-				//fmt.Printf("Continuing after finding static %v\n", child)
-				n = child
-			} else {
-				// no luck in the static? check wildcard children
-				for _, wildcardChildren := range n.wildcardChildren {
-					nextSlash := strings.Index(path, "/")
-
-					// check whether we have something after that path
-					if len(path[nextSlash+1:]) == 0 {
-						if params == nil {
-							params = make(map[string]string)
-						}
-						params[wildcardChildren.path[:len(wildcardChildren.path)-1]] = path[:nextSlash]
-						return wildcardChildren, params
-					}
-					// check if next token matches
-					//fmt.Printf("Next token is %s\n", path[strings.Index(path, "/")+1:])
-					child := findInStatic(wildcardChildren, path[nextSlash+1:])
-					if child != nil {
-						//fmt.Printf("Continuing after finding wildcard %v\n", wildcardChildren)
-						n = wildcardChildren
-						if params == nil {
-							params = make(map[string]string)
-						}
-						params[wildcardChildren.path[:len(wildcardChildren.path)-1]] = path[:nextSlash]
-						// Very stupid hack due to adding / everywhere
-						path = path[1:]
-					}
-				}
-			}
-
-		} else {
+		// second part handles trailing slash
+		if len(path) == 0 || (len(path) == 1 && path[0] == '/') {
 			return n, params
 		}
 
+		if n.wildcardChild == nil {
+			c := path[0]
+			for i, index := range n.Indices {
+				if c == index {
+					n = n.staticChildren[i]
+					continue FIND
+				}
+			}
+
+			// TODO: handle 404
+			return nil, params
+		}
+
+		// no luck in the static? check wildcard child
+		// Faster than strings.Index
+		nextSlash := 0
+		for nextSlash < len(path) && path[nextSlash] != '/' {
+			nextSlash++
+		}
+
+		nextToken := path[nextSlash:]
+		if params == nil {
+			params = map[string]string{
+				n.wildcardChild.path: path[:nextSlash],
+			}
+		} else {
+			params[n.wildcardChild.path] = path[:nextSlash]
+		}
+
+		// Was it the end of the path?
+		if len(nextToken) == 0 {
+			return n.wildcardChild, params
+		}
+
+		// So we have something after the param, must be a static
+		c := nextToken[0]
+		for i, index := range n.wildcardChild.Indices {
+			if c == index {
+				path = path[nextSlash:]
+				n = n.wildcardChild.staticChildren[i]
+				continue FIND
+			}
+		}
+
+		// TODO: handle 404
+		return nil, params
 	}
 
 	fmt.Printf("404: path: %s, node path: %s\n", path, n.path)
 	// Ain't got nothing
 	// TODO: 404 handling
-	return n, params
+	return nil, params
 }
