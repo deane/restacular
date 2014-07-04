@@ -70,6 +70,7 @@ func createRouter() *router {
 	router.POST("/contacts", fakeView)
 	router.DELETE("/contacts/:id", fakeView)
 
+	// Not doable
 	router.POST("/accounts/:userToken/:accountType/:accountName", fakeView)
 
 	router.GET("/settings/:id", fakeView)

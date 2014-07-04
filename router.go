@@ -24,8 +24,24 @@ func NewRouter(baseURL string) *router {
 
 type HandlerFunc func(Context, http.ResponseWriter, *http.Request)
 
+type Param struct {
+	Name  string
+	Value string
+}
+
+type Params []Param
+
+func (params Params) Get(name string) string {
+	for _, param := range params {
+		if param.Name == name {
+			return param.Value
+		}
+	}
+	return ""
+}
+
 type Context struct {
-	Params map[string]string
+	Params Params
 	Env    map[string]interface{}
 }
 
@@ -86,7 +102,7 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	path := req.URL.Path
 
-	node, params := router.tree.find(strings.ToLower(path))
+	node, params := router.tree.find(path)
 
 	if node != nil {
 		if handler, ok := node.handlers[req.Method]; ok {

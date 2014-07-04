@@ -3,21 +3,13 @@ restacular
 
 ## Router
 Several things to fix before being usable:
-- stop adding / everywhere => moved that part to the router for now (still want a proper fix)
-- rewrite the find method of the trie to use a loop to avoid passing a pointer to a map
-- add more checks when adding route to prevent a bad tree
+- add more checks when adding route to prevent a bad tree (+ tests)
+- count number of child having params
 
 Perfs:
-Initial:
-	BenchmarkGettingRouteWithoutParam	20000000	       105 ns/op	       8 B/op	       0 allocs/op
-	BenchmarkGettingRouteWithParam	 1000000	      1663 ns/op	     785 B/op	       6 allocs/op
-After toLower(path)
-	BenchmarkGettingRouteWithoutParam	10000000	       169 ns/op	       8 B/op	       0 allocs/op
-	BenchmarkGettingRouteWithParam	 1000000	      1769 ns/op	     794 B/op	       7 allocs/op
-After rewriting find()
-	BenchmarkGettingRouteWithoutParam	10000000	       217 ns/op	      16 B/op	       1 allocs/op
-	BenchmarkGettingRouteWithOneParam	 1000000	      1156 ns/op	     436 B/op	       5 allocs/op
-	BenchmarkGettingRouteWithTwoParam	 1000000	      1809 ns/op	     487 B/op	       5 allocs/op
+BenchmarkGettingRouteWithoutParam	50000000	        32.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGettingRouteWithOneParam	10000000	       247 ns/op	      97 B/op	       1 allocs/op
+BenchmarkGettingRouteWithTwoParam	10000000	       285 ns/op	      97 B/op	       1 allocs/op
 
 ## TODO now:
 - create interface for a Resource as defined in the gist

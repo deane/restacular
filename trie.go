@@ -209,8 +209,8 @@ func (n *node) addPath(path string, addPriority bool) *node {
 	return child.addPath(remainingPath, true)
 }
 
-func (n *node) find(path string) (*node, map[string]string) {
-	var params map[string]string
+func (n *node) find(path string) (*node, Params) {
+	var params Params
 
 FIND:
 	for len(path) >= len(n.path) {
@@ -245,12 +245,14 @@ FIND:
 
 		nextToken := path[nextSlash:]
 		if params == nil {
-			params = map[string]string{
-				n.wildcardChild.path: path[:nextSlash],
-			}
-		} else {
-			params[n.wildcardChild.path] = path[:nextSlash]
+			// TODO: do like httprouter and count number of params below a given node
+			// 3 params sounds about right for an API
+			params = make(Params, 0, 3)
 		}
+		params = append(params, Param{
+			Name:  n.wildcardChild.path,
+			Value: path[:nextSlash],
+		})
 
 		// Was it the end of the path?
 		if len(nextToken) == 0 {

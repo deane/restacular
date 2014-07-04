@@ -17,6 +17,7 @@ func createTrie() *node {
 	tree.addPath("ideas/:id", true)
 	tree.addPath("images/:id", true)
 	tree.addPath("images/:id/similar/:similarId", true)
+	tree.addPath("images/:id/similar/:similarId/comments/:commentId", true)
 
 	return tree
 }
@@ -67,15 +68,14 @@ func TestFindingRoutes(t *testing.T) {
 		t.Errorf("Got %s as path instead of riends when querying users", node.path)
 	}
 
-	if params["id"] != "142" {
+	if params.Get("id") != "142" {
 		t.Log("\n" + tree.printTree("", ""))
-		t.Log(params["id"])
 		t.Errorf("Got %v as params but didn't get id=142", params)
 	}
 
 	// Try the ones from the benchmarks to make sure we don't benchmark 404
 	node, params = tree.find("/images/1")
-	if node == nil || params["id"] != "1" {
+	if node == nil || params.Get("id") != "1" {
 		t.Log("\n" + tree.printTree("", ""))
 		t.Errorf("Could not find /images/1 in the trie or the params was not set properly")
 	}
@@ -120,5 +120,15 @@ func BenchmarkGettingPathWithTwoParam(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		tree.find("/images/1/similar/10")
+	}
+}
+
+func BenchmarkGettingPathWithThreeParam(b *testing.B) {
+	tree := createTrie()
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		tree.find("/images/1/similar/10/comments/120")
 	}
 }
