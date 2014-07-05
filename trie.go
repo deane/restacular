@@ -33,7 +33,7 @@ type node struct {
 
 // printTree is a util function to get a text representation of the trie for debugging/testing
 func (n *node) printTree(indent string, nodeType string) string {
-	line := fmt.Sprintf("%s %02d %s%s [%d]\n", indent, n.priority, nodeType, n.path, n.handlers)
+	line := fmt.Sprintf("%s %02d %s%s [%v]\n", indent, n.priority, nodeType, n.path, n.handlers)
 	indent += "  "
 
 	for _, node := range n.staticChildren {
