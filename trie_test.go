@@ -10,14 +10,14 @@ func createTrie() *node {
 	tree := &node{path: "/"}
 
 	// leading and trailing slash will have been removed by the router
-	tree.addPath("users", true)
-	tree.addPath("users/:id", true)
-	tree.addPath("users/:id/files", true)
-	tree.addPath("users/:id/friends", true)
-	tree.addPath("ideas/:id", true)
-	tree.addPath("images/:id", true)
-	tree.addPath("images/:id/similar/:similarId", true)
-	tree.addPath("images/:id/similar/:similarId/comments/:commentId", true)
+	tree.addPath("users")
+	tree.addPath("users/:id")
+	tree.addPath("users/:id/files")
+	tree.addPath("users/:id/friends")
+	tree.addPath("ideas/:id")
+	tree.addPath("images/:id")
+	tree.addPath("images/:id/similar/:similarId")
+	tree.addPath("images/:id/similar/:similarId/comments/:commentId")
 
 	return tree
 }
@@ -123,6 +123,7 @@ func BenchmarkGettingPathWithTwoParam(b *testing.B) {
 	}
 }
 
+// This will be a bit slower than the others
 func BenchmarkGettingPathWithThreeParam(b *testing.B) {
 	tree := createTrie()
 	b.ReportAllocs()

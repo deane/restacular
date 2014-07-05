@@ -7,11 +7,12 @@ import (
 )
 
 type router struct {
-	baseURL          string
-	resourcesMapping map[string]string
-	tree             *node
-	NotFoundHandler  func(http.ResponseWriter, *http.Request)
-	PanicHandler     func(http.ResponseWriter, *http.Request, interface{})
+	baseURL                 string
+	resourcesMapping        map[string]string
+	tree                    *node
+	NotFoundHandler         func(http.ResponseWriter, *http.Request)
+	MethodNotAllowedHandler func(http.ResponseWriter, *http.Request, map[string]HandlerFunc)
+	PanicHandler            func(http.ResponseWriter, *http.Request, interface{})
 }
 
 func NewRouter(baseURL string) *router {
@@ -46,10 +47,16 @@ type Context struct {
 }
 
 func (router *router) Handle(method string, path string, handler HandlerFunc) {
-	// TODO: check method is valid
-	// TODO: check that first char is / otherwise panic
-	node := router.tree.addPath(strings.ToLower(path[1:]), true)
+	if path[0] != '/' {
+		panic(fmt.Sprintf("Path %s must start with /", path))
+	}
+	// Remove leading slash first
+	path = path[1:]
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
 
+	node := router.tree.addPath(path)
 	node.setHandler(method, handler)
 }
 
@@ -78,6 +85,8 @@ func (router *router) DELETE(path string, handler HandlerFunc) {
 	router.Handle("DELETE", path, handler)
 }
 
+// AddResource adds a resource to the router, it will add all the routes it contains
+// and panic if a resource with the same name is already registered
 func (router *router) AddResource(name string, resourceHandler ResourceHandler) {
 	resource := resourceHandler.Define()
 
@@ -100,9 +109,7 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		}(resp, req)
 	}
 
-	path := req.URL.Path
-
-	node, params := router.tree.find(path)
+	node, params := router.tree.find(req.URL.Path)
 
 	if node != nil {
 		if handler, ok := node.handlers[req.Method]; ok {
@@ -111,9 +118,18 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			}
 			handler(context, resp, req)
 			return
+		} else {
+			// 405
+			if router.MethodNotAllowedHandler != nil {
+				router.MethodNotAllowedHandler(resp, req, node.handlers)
+			} else {
+				notAllowedHandler(resp, req, node.handlers)
+			}
+			return
 		}
 	}
 
+	// 404
 	if router.NotFoundHandler != nil {
 		router.NotFoundHandler(resp, req)
 	} else {
@@ -121,6 +137,25 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 
 }
+
+// PrintRoutes is a debug utility that prints the trie with the priority/handlers to the console
 func (r *router) PrintRoutes() {
 	fmt.Println(r.tree.printTree("", ""))
+}
+
+// notAllowedHandler is a default handler for a 405 error, it sets the error code and the Allow header
+// with the appropriate methods
+func notAllowedHandler(resp http.ResponseWriter, req *http.Request, handlers map[string]HandlerFunc) {
+	var methods []string
+
+	for method := range handlers {
+		methods = append(methods, method)
+	}
+
+	allowHeader := strings.Join(methods, ", ")
+
+	if len(allowHeader) > 0 {
+		resp.Header().Add("Allow", allowHeader)
+	}
+	resp.WriteHeader(http.StatusMethodNotAllowed)
 }

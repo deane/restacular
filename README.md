@@ -2,14 +2,15 @@ restacular
 ==========
 
 ## Router
-Several things to fix before being usable:
-- add more checks when adding route to prevent a bad tree (+ tests)
-- count number of child having params
+Few things to think of:
+- reverse urls
 
 Perfs:
-BenchmarkGettingRouteWithoutParam	50000000	        32.4 ns/op	       0 B/op	       0 allocs/op
-BenchmarkGettingRouteWithOneParam	10000000	       247 ns/op	      97 B/op	       1 allocs/op
-BenchmarkGettingRouteWithTwoParam	10000000	       285 ns/op	      97 B/op	       1 allocs/op
+BenchmarkGettingRouteWithoutParam	50000000	        32.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkGettingRouteWithOneParam	10000000	       216 ns/op	      65 B/op	       1 allocs/op
+BenchmarkGettingRouteWithTwoParam	10000000	       254 ns/op	      65 B/op	       1 allocs/op
+
+Performance will degrade a bit if you have more than 2 params in your URL (about 200ns more per additional param).
 
 ## TODO now:
 - create interface for a Resource as defined in the gist

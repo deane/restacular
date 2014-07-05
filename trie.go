@@ -14,14 +14,16 @@ type node struct {
 	// contains the first char of the childrens paths
 	// index in that array match the index in the staticChildren array
 	// and are ordered by their priority (highest first)
-	Indices []byte
+	indices []byte
 
 	// children nodes
 	staticChildren []*node
 
 	// wildcard nodes (those :param ones)
-	isWildcard    bool
 	wildcardChild *node
+
+	// Is the current node a wildcard one?
+	isWildcard bool
 
 	// what are the actual handlers for that given path
 	// those are set in the router directly rather carrying them around
@@ -33,6 +35,7 @@ type node struct {
 func (n *node) printTree(indent string, nodeType string) string {
 	line := fmt.Sprintf("%s %02d %s%s [%d]\n", indent, n.priority, nodeType, n.path, n.handlers)
 	indent += "  "
+
 	for _, node := range n.staticChildren {
 		line += node.printTree(indent, "")
 	}
@@ -44,6 +47,7 @@ func (n *node) printTree(indent string, nodeType string) string {
 	return line
 }
 
+// setHandler is used in the router to assign the HTTP handlers to a leaf
 func (n *node) setHandler(method string, handler HandlerFunc) {
 	if n.handlers == nil {
 		n.handlers = make(map[string]HandlerFunc)
@@ -57,22 +61,23 @@ func (n *node) setHandler(method string, handler HandlerFunc) {
 func (n *node) sortChildren(i int) {
 	for i > 0 && n.staticChildren[i].priority > n.staticChildren[i-1].priority {
 		n.staticChildren[i], n.staticChildren[i-1] = n.staticChildren[i-1], n.staticChildren[i]
-		n.Indices[i], n.Indices[i-1] = n.Indices[i-1], n.Indices[i]
+		n.indices[i], n.indices[i-1] = n.indices[i-1], n.indices[i]
 		i -= 1
 	}
 }
 
+// addStaticNode takes a token and create a child node for the current node containg it
 func (n *node) addStaticNode(token string) *node {
 	child := &node{
 		path: token,
 	}
 
 	// append or create the first char array
-	if n.Indices == nil {
-		n.Indices = []byte{token[0]}
+	if n.indices == nil {
+		n.indices = []byte{token[0]}
 		n.staticChildren = []*node{child}
 	} else {
-		n.Indices = append(n.Indices, token[0])
+		n.indices = append(n.indices, token[0])
 		// and add it to static children (of men)
 		n.staticChildren = append(n.staticChildren, child)
 	}
@@ -88,7 +93,7 @@ func (n *node) findCommonStaticChild(token string) (*node, int, int) {
 	var commonChild *node
 	var indexChild int
 
-	for i, char := range n.Indices {
+	for i, char := range n.indices {
 		if char == token[0] {
 			commonChild = n.staticChildren[i]
 			// we want to know how many chars they have in common
@@ -104,16 +109,9 @@ func (n *node) findCommonStaticChild(token string) (*node, int, int) {
 	return commonChild, commonUntil, indexChild
 }
 
-// addPath builds the trie and return the node for the path we just added
-// The addPriority is a bit hackish way to ensure we don't double the priority
-// when adding static nodes since we add priority right away in that case to
-// reorder the list
-func (n *node) addPath(path string, addPriority bool) *node {
-	// TODO: remove need for this hack
-	// Always increment the priority of the node we're going through
-	if addPriority {
-		n.priority++
-	}
+// addPath builds the trie and return the leaf node for the path we just added
+func (n *node) addPath(path string) *node {
+	n.priority++
 
 	// if we reached the end of the path, return the current node
 	if len(path) == 0 {
@@ -140,8 +138,6 @@ func (n *node) addPath(path string, addPriority bool) *node {
 		// No need for remaining path if we're at a leaf node
 	}
 
-	//fmt.Printf("%s - %s - %s\n", path, token, remainingPath)
-
 	// Wildchild path
 	if firstChar == ':' {
 		var child *node
@@ -151,11 +147,6 @@ func (n *node) addPath(path string, addPriority bool) *node {
 		if n.wildcardChild != nil {
 			if token == n.wildcardChild.path {
 				child = n.wildcardChild
-			} else {
-				if n.isWildcard {
-					panic("Can't have 2 wildcard nodes at the same level")
-
-				}
 			}
 		}
 
@@ -168,7 +159,7 @@ func (n *node) addPath(path string, addPriority bool) *node {
 			child = n.wildcardChild
 		}
 
-		return child.addPath(remainingPath, true)
+		return child.addPath(remainingPath)
 	}
 
 	// We got a normal string !
@@ -182,11 +173,14 @@ func (n *node) addPath(path string, addPriority bool) *node {
 	if commonChild != nil {
 		// 2 cases there as well
 		// Either the path is fully the same and we can just continue our merry trip
-		// TODO: check in which case we get commonUntil == 0, if we have only one char?
 		if commonUntil == 0 || commonUntil == len(token)-1 {
+			// There's a bit of a hack here: we want to reorder the current node children and take into account that
+			// the common child will have +1 prio so we temporarily increments his prio
 			commonChild.priority++
 			n.sortChildren(indexChild)
-			return commonChild.addPath(path[commonUntil+1:], false)
+			// And put it back down 1 since it's going to get incremented by the addPath method immediately
+			commonChild.priority--
+			return commonChild.addPath(path[commonUntil+1:])
 		}
 
 		// Or it's different and we need to do a NITM (Node In The Middle, I know...)
@@ -197,16 +191,16 @@ func (n *node) addPath(path string, addPriority bool) *node {
 			path:           commonPath,
 			priority:       commonChild.priority,
 			staticChildren: []*node{commonChild},
-			Indices:        []byte{commonChild.path[0]},
+			indices:        []byte{commonChild.path[0]},
 		}
 		n.staticChildren[indexChild] = middleNode
 		n.sortChildren(indexChild)
-		return middleNode.addPath(path[commonUntil:], true)
+		return middleNode.addPath(path[commonUntil:])
 	}
 
 	// 2 - no common prefix with existing child so just append it
 	child := n.addStaticNode(token)
-	return child.addPath(remainingPath, true)
+	return child.addPath(remainingPath)
 }
 
 func (n *node) find(path string) (*node, Params) {
@@ -214,6 +208,7 @@ func (n *node) find(path string) (*node, Params) {
 
 FIND:
 	for len(path) >= len(n.path) {
+		// for static nodes, we can just get the next path using the length of the path itself
 		if n.isWildcard == false {
 			path = path[len(n.path):]
 		}
@@ -225,14 +220,14 @@ FIND:
 
 		if n.wildcardChild == nil {
 			c := path[0]
-			for i, index := range n.Indices {
+			for i, index := range n.indices {
 				if c == index {
 					n = n.staticChildren[i]
 					continue FIND
 				}
 			}
 
-			// TODO: handle 404
+			// 404
 			return nil, params
 		}
 
@@ -245,9 +240,9 @@ FIND:
 
 		nextToken := path[nextSlash:]
 		if params == nil {
-			// TODO: do like httprouter and count number of params below a given node
-			// 3 params sounds about right for an API
-			params = make(Params, 0, 3)
+			// 2 params sounds about right for an API
+			// Small performance loss if have you > 2 params in the same URL
+			params = make(Params, 0, 2)
 		}
 		params = append(params, Param{
 			Name:  n.wildcardChild.path,
@@ -261,20 +256,20 @@ FIND:
 
 		// So we have something after the param, must be a static
 		c := nextToken[0]
-		for i, index := range n.wildcardChild.Indices {
+		for i, index := range n.wildcardChild.indices {
 			if c == index {
+				// We need to get the next token but can't use the length of a wilcard path obviously
 				path = path[nextSlash:]
 				n = n.wildcardChild.staticChildren[i]
 				continue FIND
 			}
 		}
 
-		// TODO: handle 404
+		// 404
 		return nil, params
 	}
 
-	fmt.Printf("404: path: %s, node path: %s\n", path, n.path)
-	// Ain't got nothing
-	// TODO: 404 handling
+	// 404
+	fmt.Printf("Should never get there: path: %s, node path: %s\n", path, n.path)
 	return nil, params
 }

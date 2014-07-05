@@ -12,7 +12,7 @@ func (p PostResource) Define() *Resource {
 	resource := NewResource("/posts")
 
 	resource.GET("", p.List)
-	resource.POST("/:post_id", p.Post)
+	resource.POST("/:postId/", p.Post)
 
 	return resource
 }
@@ -42,7 +42,6 @@ func createRouter() *router {
 	router := NewRouter("https://www.glass.com/")
 
 	// Google glass API (https://developers.google.com/glass/v1/reference/)
-
 	router.GET("/timeline", fakeView)
 	router.GET("/timeline/:itemId", fakeView)
 	router.PUT("/timeline/:itemId", fakeView)
@@ -70,12 +69,31 @@ func createRouter() *router {
 	router.POST("/contacts", fakeView)
 	router.DELETE("/contacts/:id", fakeView)
 
-	// Not doable
 	router.POST("/accounts/:userToken/:accountType/:accountName", fakeView)
 
 	router.GET("/settings/:id", fakeView)
 
 	return router
+}
+
+func TestAddingWrongRoutes(t *testing.T) {
+	router := NewRouter("https://www.testing.com/api/")
+	panicked := false
+	panicHandler := func() {
+		if err := recover(); err != nil {
+			panicked = true
+		}
+	}
+
+	addPanicRoute := func(route string, method string) {
+		panicked = false
+		defer panicHandler()
+		router.Handle(method, route, fakeView)
+	}
+	addPanicRoute("ideas/:id/:moreId", "GET")
+	if !panicked {
+		t.Errorf("Adding ideas/:id/:moreId should have panicked")
+	}
 }
 
 func TestAddingResource(t *testing.T) {
@@ -92,10 +110,31 @@ func TestAddingResource(t *testing.T) {
 		t.Errorf("Received http code %d instead of 200", w.Code)
 	}
 
-	// Testing that we get 404 when calling an existing path but with the wrong method
+	// Testing that we get 405 when calling an existing path but with the wrong method
 	w = doRequest("POST", "/posts", router, t)
-	if w.Code != 404 {
-		t.Errorf("Received http code %d instead of 404", w.Code)
+	if w.Code != 405 {
+		t.Errorf("Received http code %d instead of 405", w.Code)
+	}
+}
+
+func TestAddingDuplicateResource(t *testing.T) {
+	router := NewRouter("https://www.testing.com/api/")
+	panicked := false
+	panicHandler := func() {
+		if err := recover(); err != nil {
+			panicked = true
+		}
+	}
+
+	addPanicResource := func(resource ResourceHandler) {
+		panicked = false
+		defer panicHandler()
+		router.AddResource("blob", resource)
+	}
+	addPanicResource(&PostResource{})
+	addPanicResource(&PostResource{})
+	if !panicked {
+		t.Errorf("Adding several resources with the same should have panicked")
 	}
 }
 
@@ -118,6 +157,24 @@ func TestFindingRouteTrailingSlash(t *testing.T) {
 	w = doRequest("GET", "/timeline/", router, t)
 	if w.Code != 200 {
 		t.Errorf("Received http code %d instead of 200", w.Code)
+	}
+}
+
+func TestGetting404(t *testing.T) {
+	router := createRouter()
+
+	w := doRequest("GET", "/schools/hogwarts", router, t)
+	if w.Code != 404 {
+		t.Errorf("Received http code %d instead of 404", w.Code)
+	}
+}
+
+func TestGetting405(t *testing.T) {
+	router := createRouter()
+
+	w := doRequest("DELETE", "/timeline", router, t)
+	if w.Code != 405 {
+		t.Errorf("Received http code %d instead of 405", w.Code)
 	}
 }
 
