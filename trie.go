@@ -5,6 +5,35 @@ import (
 	"strings"
 )
 
+// This file implements a trie (as the observant will have noticed by reading the name of the file)
+// A tree is a simple data structure that has strings has key and every descendant of a node share
+// a common prefix.
+// Here's an example:
+//  - 5 /
+//  - 2   u
+//  - 2     sers
+//  - 1		  /
+//  - 1		   :id
+//  - 3     ploads
+//  - 2          /
+//  - 1           :id
+//  - 1               /
+//  - 1                 comments
+//
+// The actuals routes here are /users, /users/:id, /uploads, /uploads/:id, /upload/:id/comments
+// In that case users and upload share the prefix 'u' so they are place under a node with a key of u.
+// We keep track of the first letter of each child path in a node to be able to quickly see if there's
+// a match when adding/looking up nodes.
+// Since we're using a trie, a child path starting with the same letter will always be the right path
+// to follow.
+// In order to ensure the best speed when looking up a route, each node is given a priority which is
+// the number of leaf node under itself.
+// The numbers in the left of the the graph above show the priority in that case.
+// The trie doesn't care how many handlers are attached to a leaf node, a leaf has a priority of 1 whether
+// it has 1 or 5 handlers.
+// The find method simply iterates over the path and tries to find the leaf by going down the tree.
+// When it encounters what's supposed to be a wildcard path, it just looks after that one if possible.
+
 type node struct {
 	path string
 
@@ -16,7 +45,7 @@ type node struct {
 	// and are ordered by their priority (highest first)
 	indices []byte
 
-	// children nodes
+	// children nodes, but only the static ones, ie /users or /images
 	staticChildren []*node
 
 	// wildcard nodes (those :param ones)
@@ -78,7 +107,7 @@ func (n *node) addStaticNode(token string) *node {
 		n.staticChildren = []*node{child}
 	} else {
 		n.indices = append(n.indices, token[0])
-		// and add it to static children (of men)
+		// and add it to static children (of men, lame joke eh)
 		n.staticChildren = append(n.staticChildren, child)
 	}
 
@@ -110,6 +139,7 @@ func (n *node) findCommonStaticChild(token string) (*node, int, int) {
 }
 
 // addPath builds the trie and return the leaf node for the path we just added
+// It will also creates all the intermediary node if it found a common prefix
 func (n *node) addPath(path string) *node {
 	n.priority++
 
@@ -165,7 +195,6 @@ func (n *node) addPath(path string) *node {
 	// We got a normal string !
 	// 2 things can happen here
 	commonChild, commonUntil, indexChild := n.findCommonStaticChild(token)
-	//fmt.Printf("Common child: %v, common until: %d, node path:%s\n\n", commonChild, commonUntil, n.path)
 
 	// 1 - some child nodes start with the same char as the current path
 	// in that case we want to find the common prefix between both of them
@@ -203,6 +232,10 @@ func (n *node) addPath(path string) *node {
 	return child.addPath(remainingPath)
 }
 
+// find gets a path and tries to match it with a node, returning params if there were some
+// If it can't find anything, it will return nil for the node, meaning a 404 at the end
+// It will also automatically match path with/without trailing slash, ie /users and /users/
+// are representing the same node
 func (n *node) find(path string) (*node, Params) {
 	var params Params
 
