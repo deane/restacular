@@ -1,23 +1,35 @@
 package restacular
 
 import (
+	"reflect"
 	"testing"
 )
 
 // Tests the trie independtly of the router
 
+func getPaths() []string {
+	// leading and trailing slash will have been removed by the router
+	return []string{
+		"users",
+		"users/:id",
+		"users/:id/files",
+		"users/:id/friends",
+		"ideas/:id",
+		"images/:id",
+		"images/:id/similar/:similarId",
+		"images/:id/similar/:similarId/comments/:commentId",
+		"users/:id/filesystem",
+		"users/:id/filet",
+	}
+
+}
+
 func createTrie() *node {
 	tree := &node{path: "/"}
 
-	// leading and trailing slash will have been removed by the router
-	tree.addPath("users")
-	tree.addPath("users/:id")
-	tree.addPath("users/:id/files")
-	tree.addPath("users/:id/friends")
-	tree.addPath("ideas/:id")
-	tree.addPath("images/:id")
-	tree.addPath("images/:id/similar/:similarId")
-	tree.addPath("images/:id/similar/:similarId/comments/:commentId")
+	for _, path := range getPaths() {
+		tree.addPath(path)
+	}
 
 	return tree
 }
@@ -43,54 +55,49 @@ func TestAddingRoutes(t *testing.T) {
 		t.Errorf("Got %s as path instead of users for child node", child.path)
 	}
 
-	// the node should have a priority of 4 and its child should have 3
-	if child.priority != 4 {
+	// the node should have a priority of 6
+	if child.priority != 6 {
 		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Got wrong priorities: got %d (expected 4) for child", child.priority)
+		t.Errorf("Got wrong priorities: got %d (expected 6) for child", child.priority)
+	}
+}
+
+type testPaths struct {
+	path        string
+	shouldBeNil bool // True if checking for 404
+	params      Params
+}
+
+func testMultiplePaths(t *testing.T, root *node, pathsToTest []testPaths) {
+	for _, pathToTest := range pathsToTest {
+		node, params := root.find(pathToTest.path)
+
+		if node == nil && !pathToTest.shouldBeNil {
+			t.Errorf("Didn't find a handler for %s", pathToTest.path)
+		}
+		if !pathToTest.shouldBeNil && !reflect.DeepEqual(params, pathToTest.params) {
+			t.Errorf("Params mismatch for route '%s': %v (expected) - %v (found)", pathToTest.path, pathToTest.params, params)
+		}
 	}
 }
 
 func TestFindingRoutes(t *testing.T) {
 	tree := createTrie()
 
-	// Find a basic static one
-	node, params := tree.find("/users") // Router will add a /
-
-	if node.path != "users" {
-		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Got %s as path instead of users when querying users", node.path)
-	}
-
-	// Find a wildcard path
-	node, params = tree.find("/users/142/friends")
-	if node.path != "riends" {
-		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Got %s as path instead of riends when querying users", node.path)
-	}
-
-	if params.Get("id") != "142" {
-		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Got %v as params but didn't get id=142", params)
-	}
-
-	// Try the ones from the benchmarks to make sure we don't benchmark 404
-	node, params = tree.find("/images/1")
-	if node == nil || params.Get("id") != "1" {
-		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Could not find /images/1 in the trie or the params was not set properly")
-	}
-
-	node, params = tree.find("/images/1/similar/10")
-	if node == nil {
-		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Could not find /images/1/similar/10 in the trie")
-	}
-
-	node, params = tree.find("/hello/kitty")
-	if node != nil {
-		t.Log("\n" + tree.printTree("", ""))
-		t.Errorf("Should not have found a node")
-	}
+	testMultiplePaths(t, tree, []testPaths{
+		{"/users", false, nil},
+		{"/users/42", false, Params{Param{"id", "42"}}},
+		{"/users/42/files", false, Params{Param{"id", "42"}}},
+		{"/users/42/friends", false, Params{Param{"id", "42"}}},
+		{"/ideas/21", false, Params{Param{"id", "21"}}},
+		{"/images/2", false, Params{Param{"id", "2"}}},
+		{"/images/2/similar/12", false, Params{Param{"id", "2"}, Param{"similarId", "12"}}},
+		{"/images/2/similar/12/comments/1234", false, Params{Param{"id", "2"}, Param{"similarId", "12"}, Param{"commentId", "1234"}}},
+		{"/users/21/filesystem", false, Params{Param{"id", "21"}}},
+		{"/users/21/filet", false, Params{Param{"id", "21"}}},
+		{"/users/123/something", true, nil},
+		{"/hello/kitty", true, nil},
+	})
 }
 
 func BenchmarkGettingPathWithoutParam(b *testing.B) {

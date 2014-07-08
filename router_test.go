@@ -76,26 +76,6 @@ func createRouter() *router {
 	return router
 }
 
-func TestAddingWrongRoutes(t *testing.T) {
-	router := NewRouter("https://www.testing.com/api/")
-	panicked := false
-	panicHandler := func() {
-		if err := recover(); err != nil {
-			panicked = true
-		}
-	}
-
-	addPanicRoute := func(route string, method string) {
-		panicked = false
-		defer panicHandler()
-		router.Handle(method, route, fakeView)
-	}
-	addPanicRoute("ideas/:id/:moreId", "GET")
-	if !panicked {
-		t.Errorf("Adding ideas/:id/:moreId should have panicked")
-	}
-}
-
 func TestAddingResource(t *testing.T) {
 	router := NewRouter("https://www.testing.com/api/")
 	router.AddResource("posts", &PostResource{})
@@ -138,44 +118,35 @@ func TestAddingDuplicateResource(t *testing.T) {
 	}
 }
 
-func TestFindingRouteCaseSensitivy(t *testing.T) {
-	router := createRouter()
-	w := doRequest("GET", "/timelINE", router, t)
-	if w.Code != 200 {
-		t.Errorf("Received http code %d instead of 200", w.Code)
-	}
+type testRoute struct {
+	method       string
+	path         string
+	expectedCode int
 }
 
-func TestFindingRouteTrailingSlash(t *testing.T) {
+func TestFindRoutes(t *testing.T) {
 	router := createRouter()
 
-	w := doRequest("GET", "/timeline", router, t)
-	if w.Code != 200 {
-		t.Errorf("Received http code %d instead of 200", w.Code)
+	requests := []testRoute{
+		{"GET", "/timeline", 200},
+		{"GET", "/timeLINE", 200},                 // case sensitivity
+		{"GET", "/timeline/", 200},                // trailing slash
+		{"GET", "/students", 404},                 // 404
+		{"DELETE", "/timeline", 405},              // no DELETE on that url
+		{"GET", "/timeline/1/attachments/2", 200}, // 404
+		{"DELETE", "/subscriptions/21", 200},
+		{"PUT", "/subscriptions/21", 200},
+		{"POST", "/subscriptions", 200},
+		{"PATCH", "/contacts/21", 200},
 	}
 
-	w = doRequest("GET", "/timeline/", router, t)
-	if w.Code != 200 {
-		t.Errorf("Received http code %d instead of 200", w.Code)
+	for _, request := range requests {
+		w := doRequest(request.method, request.path, router, t)
+		if w.Code != request.expectedCode {
+			t.Errorf("Received http code %d instead of %d for %s [%s]", w.Code, request.expectedCode, request.path, request.method)
+		}
 	}
-}
 
-func TestGetting404(t *testing.T) {
-	router := createRouter()
-
-	w := doRequest("GET", "/schools/hogwarts", router, t)
-	if w.Code != 404 {
-		t.Errorf("Received http code %d instead of 404", w.Code)
-	}
-}
-
-func TestGetting405(t *testing.T) {
-	router := createRouter()
-
-	w := doRequest("DELETE", "/timeline", router, t)
-	if w.Code != 405 {
-		t.Errorf("Received http code %d instead of 405", w.Code)
-	}
 }
 
 type mockResponseWriter struct{}

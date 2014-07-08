@@ -85,9 +85,9 @@ func (n *node) setHandler(method string, handler HandlerFunc) {
 	n.handlers[method] = handler
 }
 
-// sortChildren sorts from the given index to the front of the static children array
-// in order to keep childre with the highest priority at the front
-func (n *node) sortChildren(i int) {
+// reorderChildren reorders from the given index to the front of the static children array
+// in order to keep children with the highest priority at the front
+func (n *node) reorderChildren(i int) {
 	for i > 0 && n.staticChildren[i].priority > n.staticChildren[i-1].priority {
 		n.staticChildren[i], n.staticChildren[i-1] = n.staticChildren[i-1], n.staticChildren[i]
 		n.indices[i], n.indices[i-1] = n.indices[i-1], n.indices[i]
@@ -170,26 +170,25 @@ func (n *node) addPath(path string) *node {
 
 	// Wildchild path
 	if firstChar == ':' {
-		var child *node
+		if n.isWildcard {
+			panic("You cannot add a wildcard node as child of a wildcard")
+		}
 		token = token[1:]
 
 		// check if we already have it
 		if n.wildcardChild != nil {
 			if token == n.wildcardChild.path {
-				child = n.wildcardChild
+				return n.wildcardChild.addPath(remainingPath)
 			}
 		}
 
 		// New wildcard node, create a node object and assign it to the current node
-		if child == nil {
-			n.wildcardChild = &node{
-				path:       token,
-				isWildcard: true,
-			}
-			child = n.wildcardChild
+		n.wildcardChild = &node{
+			path:       token,
+			isWildcard: true,
 		}
 
-		return child.addPath(remainingPath)
+		return n.wildcardChild.addPath(remainingPath)
 	}
 
 	// We got a normal string !
@@ -206,7 +205,7 @@ func (n *node) addPath(path string) *node {
 			// There's a bit of a hack here: we want to reorder the current node children and take into account that
 			// the common child will have +1 prio so we temporarily increments his prio
 			commonChild.priority++
-			n.sortChildren(indexChild)
+			n.reorderChildren(indexChild)
 			// And put it back down 1 since it's going to get incremented by the addPath method immediately
 			commonChild.priority--
 			return commonChild.addPath(path[commonUntil+1:])
@@ -223,7 +222,7 @@ func (n *node) addPath(path string) *node {
 			indices:        []byte{commonChild.path[0]},
 		}
 		n.staticChildren[indexChild] = middleNode
-		n.sortChildren(indexChild)
+		n.reorderChildren(indexChild)
 		return middleNode.addPath(path[commonUntil:])
 	}
 
