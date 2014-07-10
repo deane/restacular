@@ -116,7 +116,7 @@ func (n *node) addStaticNode(token string) *node {
 
 // findCommonStaticChild looks up in the node static children to see
 // whether one of them matches the new token.
-// If so returns that node, its index and how many char they have in common
+// If so returns that node, how many char they have in common and the node index
 func (n *node) findCommonStaticChild(token string) (*node, int, int) {
 	var commonUntil int
 	var commonChild *node
@@ -127,8 +127,11 @@ func (n *node) findCommonStaticChild(token string) (*node, int, int) {
 			commonChild = n.staticChildren[i]
 			// we want to know how many chars they have in common
 			for commonUntil = range commonChild.path {
+				indexChild = i
 				if commonUntil == len(token) || token[commonUntil] != commonChild.path[commonUntil] {
-					indexChild = i
+					// we're going to do commonUntil+1 later but in those cases we want to have
+					// the exact value of commonUntil
+					commonUntil--
 					break
 				}
 			}
@@ -161,8 +164,14 @@ func (n *node) addPath(path string) *node {
 		token = "/"
 		remainingPath = path[1:]
 	} else if nextSlash != -1 {
-		token = path[0:nextSlash]
-		remainingPath = path[nextSlash:]
+		// We don't want a trailing / for a wildcard node
+		if firstChar == ':' {
+			token = path[0:nextSlash]
+			remainingPath = path[nextSlash:]
+		} else {
+			token = path[0 : nextSlash+1]
+			remainingPath = path[nextSlash+1:]
+		}
 	} else {
 		token = path
 		// No need for remaining path if we're at a leaf node
@@ -199,21 +208,20 @@ func (n *node) addPath(path string) *node {
 	// in that case we want to find the common prefix between both of them
 	// and put them as child node of that common one
 	if commonChild != nil {
-		// 2 cases there as well
-		// Either the path is fully the same and we can just continue our merry trip
-		if commonUntil == 0 || commonUntil == len(token)-1 {
-			// There's a bit of a hack here: we want to reorder the current node children and take into account that
-			// the common child will have +1 prio so we temporarily increments his prio
+		// if the current token has an existing common child with a valid substring
+		if commonChild.path == token[:commonUntil+1] {
+			// We need to sort those priorities for the current node since we're going to add one children
 			commonChild.priority++
 			n.reorderChildren(indexChild)
 			// And put it back down 1 since it's going to get incremented by the addPath method immediately
 			commonChild.priority--
+
 			return commonChild.addPath(path[commonUntil+1:])
 		}
 
 		// Or it's different and we need to do a NITM (Node In The Middle, I know...)
-		commonPath := token[0:commonUntil]
-		commonChild.path = commonChild.path[commonUntil:]
+		commonPath := token[0 : commonUntil+1]
+		commonChild.path = commonChild.path[commonUntil+1:]
 
 		middleNode := &node{
 			path:           commonPath,
@@ -223,7 +231,7 @@ func (n *node) addPath(path string) *node {
 		}
 		n.staticChildren[indexChild] = middleNode
 		n.reorderChildren(indexChild)
-		return middleNode.addPath(path[commonUntil:])
+		return middleNode.addPath(path[commonUntil+1:])
 	}
 
 	// 2 - no common prefix with existing child so just append it

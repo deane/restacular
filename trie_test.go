@@ -15,6 +15,7 @@ func getPaths() []string {
 		"users/:id/files",
 		"users/:id/friends",
 		"ideas/:id",
+		"identifiers/:id",
 		"images/:id",
 		"images/:id/similar/:similarId",
 		"images/:id/similar/:similarId/comments/:commentId",
@@ -30,12 +31,11 @@ func createTrie() *node {
 	for _, path := range getPaths() {
 		tree.addPath(path)
 	}
-
 	return tree
 }
 
 // Kind of integration test, verify that routes are properly added to the trie
-func TestAddingRoutes(t *testing.T) {
+func TestAddingPaths(t *testing.T) {
 	tree := createTrie()
 
 	// we should have only one child, a static one
@@ -81,7 +81,7 @@ func testMultiplePaths(t *testing.T, root *node, pathsToTest []testPaths) {
 	}
 }
 
-func TestFindingRoutes(t *testing.T) {
+func TestFindingPaths(t *testing.T) {
 	tree := createTrie()
 
 	testMultiplePaths(t, tree, []testPaths{
@@ -90,6 +90,7 @@ func TestFindingRoutes(t *testing.T) {
 		{"/users/42/files", false, Params{Param{"id", "42"}}},
 		{"/users/42/friends", false, Params{Param{"id", "42"}}},
 		{"/ideas/21", false, Params{Param{"id", "21"}}},
+		{"/identifiers/21", false, Params{Param{"id", "21"}}},
 		{"/images/2", false, Params{Param{"id", "2"}}},
 		{"/images/2/similar/12", false, Params{Param{"id", "2"}, Param{"similarId", "12"}}},
 		{"/images/2/similar/12/comments/1234", false, Params{Param{"id", "2"}, Param{"similarId", "12"}, Param{"commentId", "1234"}}},
