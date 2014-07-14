@@ -1,7 +1,6 @@
 package restacular
 
 import (
-	"github.com/julienschmidt/httprouter"
 	"log"
 )
 
@@ -13,7 +12,7 @@ type Resource struct {
 type Route struct {
 	method  string
 	pattern string
-	handler httprouter.Handle
+	handler HandlerFunc
 }
 
 type ResourceHandler interface {
@@ -25,14 +24,13 @@ func NewResource(basePath string) *Resource {
 }
 
 // AddRoute calls the HTTP_METHOD func or panic
-func (resource *Resource) AddRoute(method string, pattern string, handler httprouter.Handle) {
+func (resource *Resource) AddRoute(method string, pattern string, handler HandlerFunc) {
 	methods := map[string]bool{
-		"GET":     true,
-		"POST":    true,
-		"PUT":     true,
-		"PATCH":   true,
-		"DELETE":  true,
-		"OPTIONS": true,
+		"GET":    true,
+		"POST":   true,
+		"PUT":    true,
+		"PATCH":  true,
+		"DELETE": true,
 	}
 
 	if _, ok := methods[method]; ok == false {
@@ -41,26 +39,22 @@ func (resource *Resource) AddRoute(method string, pattern string, handler httpro
 	resource.routes = append(resource.routes, &Route{method, resource.basePath + pattern, handler})
 }
 
-func (resource *Resource) GET(pattern string, handler httprouter.Handle) {
+func (resource *Resource) GET(pattern string, handler HandlerFunc) {
 	resource.AddRoute("GET", pattern, handler)
 }
 
-func (resource *Resource) POST(pattern string, handler httprouter.Handle) {
+func (resource *Resource) POST(pattern string, handler HandlerFunc) {
 	resource.AddRoute("POST", pattern, handler)
 }
 
-func (resource *Resource) PUT(pattern string, handler httprouter.Handle) {
+func (resource *Resource) PUT(pattern string, handler HandlerFunc) {
 	resource.AddRoute("PUT", pattern, handler)
 }
 
-func (resource *Resource) PATCH(pattern string, handler httprouter.Handle) {
+func (resource *Resource) PATCH(pattern string, handler HandlerFunc) {
 	resource.AddRoute("PATCH", pattern, handler)
 }
 
-func (resource *Resource) DELETE(pattern string, handler httprouter.Handle) {
+func (resource *Resource) DELETE(pattern string, handler HandlerFunc) {
 	resource.AddRoute("DELETE", pattern, handler)
-}
-
-func (resource *Resource) OPTIONS(pattern string, handler httprouter.Handle) {
-	resource.AddRoute("OPTIONS", pattern, handler)
 }
