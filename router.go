@@ -10,9 +10,9 @@ type router struct {
 	baseURL                 string
 	resourcesMapping        map[string]string
 	tree                    *node
-	NotFoundHandler         func(http.ResponseWriter, *http.Request)
-	MethodNotAllowedHandler func(http.ResponseWriter, *http.Request, map[string]HandlerFunc)
-	PanicHandler            func(http.ResponseWriter, *http.Request, interface{})
+	NotFoundHandler         func(ResponseWriter, *http.Request)
+	MethodNotAllowedHandler func(ResponseWriter, *http.Request, map[string]HandlerFunc)
+	PanicHandler            func(ResponseWriter, *http.Request, interface{})
 }
 
 func NewRouter(baseURL string) *router {
@@ -23,7 +23,7 @@ func NewRouter(baseURL string) *router {
 	}
 }
 
-type HandlerFunc func(Context, http.ResponseWriter, *http.Request)
+type HandlerFunc func(Context, ResponseWriter, *http.Request)
 
 type Param struct {
 	Name  string
@@ -104,7 +104,7 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if router.PanicHandler != nil {
 		defer func(resp http.ResponseWriter, req *http.Request) {
 			if rcv := recover(); rcv != nil {
-				router.PanicHandler(resp, req, rcv)
+				router.PanicHandler(ResponseWriter{resp}, req, rcv)
 			}
 		}(resp, req)
 	}
@@ -116,14 +116,14 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			context := Context{
 				Params: params,
 			}
-			handler(context, resp, req)
+			handler(context, ResponseWriter{resp}, req)
 			return
 		} else {
 			// 405
 			if router.MethodNotAllowedHandler != nil {
-				router.MethodNotAllowedHandler(resp, req, node.handlers)
+				router.MethodNotAllowedHandler(ResponseWriter{resp}, req, node.handlers)
 			} else {
-				notAllowedHandler(resp, req, node.handlers)
+				notAllowedHandler(ResponseWriter{resp}, req, node.handlers)
 			}
 			return
 		}
@@ -131,7 +131,7 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	// 404
 	if router.NotFoundHandler != nil {
-		router.NotFoundHandler(resp, req)
+		router.NotFoundHandler(ResponseWriter{resp}, req)
 	} else {
 		http.NotFound(resp, req)
 	}
@@ -145,7 +145,7 @@ func (r *router) PrintRoutes() {
 
 // notAllowedHandler is a default handler for a 405 error, it sets the error code and the Allow header
 // with the appropriate methods
-func notAllowedHandler(resp http.ResponseWriter, req *http.Request, handlers map[string]HandlerFunc) {
+func notAllowedHandler(resp ResponseWriter, req *http.Request, handlers map[string]HandlerFunc) {
 	var methods []string
 
 	for method := range handlers {
