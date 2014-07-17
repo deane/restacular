@@ -17,15 +17,15 @@ func (p PostResource) Define() *Resource {
 	return resource
 }
 
-func (p PostResource) List(context Context, resp http.ResponseWriter, req *http.Request) {
+func (p PostResource) List(context Context, resp ResponseWriter, req *http.Request) {
 	resp.WriteHeader(200)
 }
 
-func (p PostResource) Post(context Context, resp http.ResponseWriter, req *http.Request) {
+func (p PostResource) Post(context Context, resp ResponseWriter, req *http.Request) {
 	resp.WriteHeader(200)
 }
 
-func fakeView(context Context, resp http.ResponseWriter, req *http.Request) {}
+func fakeView(context Context, resp ResponseWriter, req *http.Request) {}
 
 // Small util function to quickly HTTP requests
 func doRequest(method string, path string, router *router, t *testing.T) *httptest.ResponseRecorder {
