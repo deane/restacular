@@ -5,6 +5,9 @@ import (
 	"net/http"
 )
 
+// Cramming the params in the response feels a bit weird
+// but it allows to keep the http.Handler interface
+// while staying easy to use
 type Param struct {
 	Name  string
 	Value string
