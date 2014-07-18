@@ -5,9 +5,32 @@ import (
 	"net/http"
 )
 
-// The private implementation of that one
-type ResponseWriter struct {
+type Param struct {
+	Name  string
+	Value string
+}
+
+type Params []Param
+
+func (params Params) Get(name string) string {
+	for _, param := range params {
+		if param.Name == name {
+			return param.Value
+		}
+	}
+	return ""
+}
+
+type ResponseWriter interface {
 	http.ResponseWriter
+	Respond(int, interface{})
+	Error(int, string)
+}
+
+type responseWriter struct {
+	http.ResponseWriter
+	params Params
+	env    map[string]interface{}
 }
 
 // A typical error message, maybe add some details?
@@ -22,7 +45,7 @@ func (err *ApiError) Error() string {
 
 // TODO: add logging options
 
-func (writer *ResponseWriter) Respond(code int, obj interface{}) {
+func (writer *responseWriter) Respond(code int, obj interface{}) {
 	content, err := json.Marshal(obj)
 	if err != nil {
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -33,6 +56,14 @@ func (writer *ResponseWriter) Respond(code int, obj interface{}) {
 	writer.Write(content)
 }
 
-func (writer *ResponseWriter) Error(code int, message string) {
+func (writer *responseWriter) Error(code int, message string) {
 	writer.Respond(code, &ApiError{code, message})
+}
+
+func newResponse(writer http.ResponseWriter, params Params) ResponseWriter {
+	return &responseWriter{
+		ResponseWriter: writer,
+		env:            make(map[string]interface{}),
+		params:         params,
+	}
 }

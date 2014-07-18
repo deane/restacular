@@ -23,28 +23,7 @@ func NewRouter(baseURL string) *router {
 	}
 }
 
-type HandlerFunc func(Context, ResponseWriter, *http.Request)
-
-type Param struct {
-	Name  string
-	Value string
-}
-
-type Params []Param
-
-func (params Params) Get(name string) string {
-	for _, param := range params {
-		if param.Name == name {
-			return param.Value
-		}
-	}
-	return ""
-}
-
-type Context struct {
-	Params Params
-	Env    map[string]interface{}
-}
+type HandlerFunc func(ResponseWriter, *http.Request)
 
 func (router *router) Handle(method string, path string, handler HandlerFunc) {
 	if path[0] != '/' {
@@ -104,7 +83,7 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	if router.PanicHandler != nil {
 		defer func(resp http.ResponseWriter, req *http.Request) {
 			if rcv := recover(); rcv != nil {
-				router.PanicHandler(ResponseWriter{resp}, req, rcv)
+				router.PanicHandler(newResponse(resp, nil), req, rcv)
 			}
 		}(resp, req)
 	}
@@ -113,17 +92,14 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	if node != nil {
 		if handler, ok := node.handlers[req.Method]; ok {
-			context := Context{
-				Params: params,
-			}
-			handler(context, ResponseWriter{resp}, req)
+			handler(newResponse(resp, params), req)
 			return
 		} else {
 			// 405
 			if router.MethodNotAllowedHandler != nil {
-				router.MethodNotAllowedHandler(ResponseWriter{resp}, req, node.handlers)
+				router.MethodNotAllowedHandler(newResponse(resp, params), req, node.handlers)
 			} else {
-				notAllowedHandler(ResponseWriter{resp}, req, node.handlers)
+				notAllowedHandler(newResponse(resp, params), req, node.handlers)
 			}
 			return
 		}
@@ -131,7 +107,7 @@ func (router *router) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	// 404
 	if router.NotFoundHandler != nil {
-		router.NotFoundHandler(ResponseWriter{resp}, req)
+		router.NotFoundHandler(newResponse(resp, params), req)
 	} else {
 		http.NotFound(resp, req)
 	}

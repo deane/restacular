@@ -11,11 +11,11 @@ type User struct {
 	Location string
 }
 
-func userView(context Context, resp ResponseWriter, req *http.Request) {
+func userView(resp ResponseWriter, req *http.Request) {
 	resp.Respond(200, &User{"Bob Marley", "ISS"})
 }
 
-func errorView(context Context, resp ResponseWriter, req *http.Request) {
+func errorView(resp ResponseWriter, req *http.Request) {
 	resp.Error(401, "Unauthorized")
 }
 
