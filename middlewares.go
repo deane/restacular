@@ -16,12 +16,16 @@ func GoThrough(middlewares ...Middleware) Chain {
 	return chain
 }
 
-func (chain Chain) Then(handler http.Handler) http.Handler {
+func (chain Chain) Then(handler HandlerFunc) HandlerFunc {
 	final := handler
 
 	// We execute middlewares in the reverse order of the array
 	for i := len(chain.middlewares) - 1; i >= 0; i-- {
-		final = chain.middlewares[i](final)
+		if f, ok := chain.middlewares[i](final).(HandlerFunc); ok {
+			final = f
+		} else {
+          panic("Wrong response writer in Middleware")
+        }
 	}
 
 	return final

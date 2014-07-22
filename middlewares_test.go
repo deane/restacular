@@ -7,12 +7,13 @@ import (
 
 func createTaggedMiddleware(tag string) Middleware {
 	return func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return HandlerFunc(func(w ResponseWriter, r *http.Request) {
 			w.Write([]byte(tag))
 			h.ServeHTTP(w, r)
 		})
 	}
 }
+
 func TestMiddlewareRightOrder(t *testing.T) {
 	router := NewRouter("https://www.glass.com/")
 	m1 := createTaggedMiddleware("m1\n")

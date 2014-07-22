@@ -25,6 +25,14 @@ func NewRouter(baseURL string) *router {
 
 type HandlerFunc func(ResponseWriter, *http.Request)
 
+func (handler HandlerFunc) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	if w, ok := rw.(ResponseWriter); ok {
+		handler(w, r)
+		return
+	}
+	panic("Wrong response writer passed to HandlerFunc")
+}
+
 func (router *router) Handle(method string, path string, handler HandlerFunc) {
 	if path[0] != '/' {
 		panic(fmt.Sprintf("Path %s must start with /", path))

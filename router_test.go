@@ -25,7 +25,7 @@ func (p PostResource) Post(resp ResponseWriter, req *http.Request) {
 	resp.WriteHeader(200)
 }
 
-func fakeView(resp ResponseWriter, req *http.Request) {}
+var fakeView = HandlerFunc(func(resp ResponseWriter, req *http.Request){})
 
 // Small util function to quickly HTTP requests
 func doRequest(method string, path string, router *router, t *testing.T) *httptest.ResponseRecorder {
